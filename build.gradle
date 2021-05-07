@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+}
+
+group 'org.raymarcher'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+project.ext.lwjglVersion = '3.2.3'
+project.ext.jomlVersion = '1.10.1'
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+
+    compile group: 'org.joml', name: 'joml', version:"${jomlVersion}"
+    compile group: 'org.lwjgl', name: 'lwjgl', version:"${lwjglVersion}"
+    compile group: 'org.lwjgl', name: 'lwjgl', version:"${lwjglVersion}", classifier:'natives-windows'
+    compile group: 'org.lwjgl', name: 'lwjgl-opengl', version:"${lwjglVersion}"
+    compile group: 'org.lwjgl', name: 'lwjgl-opengl', version:"${lwjglVersion}", classifier:'natives-windows'
+    compile group: 'org.lwjgl', name: 'lwjgl-glfw', version:"${lwjglVersion}"
+    compile group: 'org.lwjgl', name: 'lwjgl-glfw', version:"${lwjglVersion}", classifier:'natives-windows'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDirs "src/main/resources"
+        }
+    }
+}

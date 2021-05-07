@@ -1,0 +1,395 @@
+#version 450 core
+
+#define MAX_MARCHING_STEPS 1000
+#define MAX_DISTANCE       300
+#define MIN_HIT_DISTANCE   0.0005
+#define EPSILON            0.001
+#define PI                 3.14159265359
+#define MAX_SHAPE_COUNT    128
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(location = 1) uniform vec3 eye;
+layout(location = 2) uniform vec3 ray00;
+layout(location = 3) uniform vec3 ray01;
+layout(location = 4) uniform vec3 ray10;
+layout(location = 5) uniform vec3 ray11;
+
+layout(binding = 0, location = 0, rgba32f) uniform image2D image;
+
+/* ------------- SHAPES ------------- */
+struct Shape {
+    int type;
+    int mID;    // Sphere       RoundBox     BoxFrame     Torus    Plane
+    vec4 data0; // c.xyz r.w    c.xyz r.w    c.xyz w.w    c.xyz    n.xyz h.w
+    vec4 data1; //              b.xyz        b.xyz        d.xy
+    vec4 data2; //
+};
+
+/*layout(binding = 1, std140) uniform Scene
+{
+    Shape shapes[MAX_SHAPE_COUNT];
+};*/
+
+#define SHAPE_TYPE_SPHERE   0
+#define SHAPE_TYPE_ROUNDBOX 1
+#define SHAPE_TYPE_BOXFRAME 2
+#define SHAPE_TYPE_TORUS    3
+#define SHAPE_TYPE_PLANE    4
+#define SHAPE_TYPE_FRACTAL  5
+
+float sdSphere(in vec3 p, in Shape s) {
+    return length(p) - s.data0.w;
+}
+float sdRoundBox(in vec3 p, in Shape s) {
+    vec3 q = abs(p) - s.data1.xyz;
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - s.data0.w;
+}
+float sdBoxFrame(in vec3 p, in Shape s) {
+    p = abs(p) - s.data1.xyz;
+    vec3 q = abs(p + s.data0.w) - s.data0.w;
+    return min(min(
+        length(max(vec3(p.x, q.y, q.z), 0.0)) + min(max(p.x, max(q.y, q.z)), 0.0),
+        length(max(vec3(q.x, p.y, q.z), 0.0)) + min(max(q.x, max(p.y, q.z)), 0.0)),
+        length(max(vec3(q.x, q.y, p.z), 0.0)) + min(max(q.x, max(q.y, p.z)), 0.0));
+}
+float sdTorus(in vec3 p, in Shape s) {
+    vec2 q = vec2(length(p.xz) - s.data1.x, p.y);
+    return length(q) - s.data1.y;
+}
+float sdPlane(in vec3 p, in Shape s) {
+    return dot(p, s.data0.xyz) - s.data0.w;
+}
+
+/* ------------ MATERIALS ------------- */
+struct Material {
+    vec3 color;
+    bool reflect;
+};
+
+const Material materials[] = Material[](
+    Material(vec3(1.0, 1.0, 1.0), false),
+    Material(vec3(0.3, 0.2, 1.0), false),
+    Material(vec3(1.0, 1.0, 1.0), true)
+);
+
+/* ------------- SCENE -------------- */
+const int shapeCount = 12;
+const Shape shapes[] = Shape[](
+    Shape(SHAPE_TYPE_FRACTAL,  0, vec4(0),                vec4(0),            vec4(0)),
+    Shape(SHAPE_TYPE_PLANE,    0, vec4(0, 1, 0, -2),      vec4(0),            vec4(0)),
+    Shape(SHAPE_TYPE_SPHERE,   2, vec4(-50, 0, 0, 0) + vec4(5, -1, -15, 5.0),  vec4(0),            vec4(0)),
+    Shape(SHAPE_TYPE_ROUNDBOX, 0, vec4(-50, 0, 0, 0) + vec4(5, -0.9, 10, 0.1), vec4(1, 1, 1, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_ROUNDBOX, 2, vec4(-50, 0, 0, 0) + vec4(-30, -0.9, 10, 3), vec4(5, 30, 5, 0), vec4(0)),
+    Shape(SHAPE_TYPE_ROUNDBOX, 0, vec4(-50, 0, 0, 0) + vec4(5, -0.9, 40, 0.0), vec4(10, 5, 1, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_ROUNDBOX, 0, vec4(-50, 0, 0, 0) + vec4(5, -0.9, 40, 0.0), vec4(1, 5, 10, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_ROUNDBOX, 2, vec4(-50, 0, 0, 0) + vec4(20, -0.9, 20, 0.0), vec4(1, 5, 10, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_BOXFRAME, 1, vec4(-50, 0, 0, 0) + vec4(0, -1, 10, 0.05),  vec4(1, 1, 3, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_BOXFRAME, 0, vec4(-50, 0, 0, 0) + vec4(0, 2, 15, 0.05),  vec4(1, 1, 3, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_BOXFRAME, 0, vec4(-50, 0, 0, 0) + vec4(0, 4, 20, 0.05),  vec4(1, 1, 3, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_BOXFRAME, 0, vec4(-50, 0, 0, 0) + vec4(0, 6, 25, 0.05),  vec4(1, 1, 3, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_BOXFRAME, 1, vec4(-50, 0, 0, 0) + vec4(0, -1, 30, 0.05),  vec4(1, 1, 3, 0),   vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, -1, 15, 0),    vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 2, 15, 0),     vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 4, 15, 0),     vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 6, 15, 0),     vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 8, 15, 0),     vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 10, 15, 0),    vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 12, 15, 0),    vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 14, 15, 0),    vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 16, 15, 0),    vec4(1, 0.4, 0, 0), vec4(0)),
+    Shape(SHAPE_TYPE_TORUS,    0, vec4(-50, 0, 0, 0) + vec4(-5, 18, 15, 0),    vec4(1, 0.4, 0, 0), vec4(0))
+);
+
+float sdBox(in vec3 p, in vec3 b) {
+    vec3 q = abs(p) - b;
+    return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+float DE(vec3 p) {
+    const float scale = 30.0f;
+    p /= scale;
+    float d = sdBox(p, vec3(1.0, 1.0, 5.0));
+    float s = 2.67;
+    for(int m = 0; m < 5; m++) {
+        vec3 a = mod(p * s, 2.0) - 1.0;
+        s *= 3.0;
+        vec3 r = abs(1.0 - 3.0 * abs(a));
+        float da = max(r.x, r.y);
+        float db = max(r.y, r.z);
+        float dc = max(r.z, r.x);
+        float c = (min(da, min(db, dc)) - 1.0) / s;
+        d = max(d, c);
+    }
+    return d * scale;
+}
+
+/* ------------- SCENE -------------- */
+//vec3 q0 = vec3(mod(p.xy, 3.0) - 1.5, p.z);
+//sdf = min(sdf, boxFrameSDF(q0, BoxFrame(vec3(1), vec3(1.0), 0.04)));
+
+//vec3 q1 = vec3(p.x - 25, mod(p.yz, 3.0) - 1.5);
+//sdf = min(sdf, boxFrameSDF(q1, BoxFrame(vec3(1), vec3(1.0), 0.4)));
+
+//const float scale = 30.0f;
+//sdf = min(sdf, DE2(p / scale) * scale);
+
+float sdShape(in vec3 p, in Shape s) {
+    if (s.type == SHAPE_TYPE_SPHERE)        return sdSphere(p - s.data0.xyz, s);
+    else if (s.type == SHAPE_TYPE_ROUNDBOX) return sdRoundBox(p - s.data0.xyz, s);
+    else if (s.type == SHAPE_TYPE_BOXFRAME) return sdBoxFrame(p - s.data0.xyz, s);
+    else if (s.type == SHAPE_TYPE_TORUS)    return sdTorus(p - s.data0.xyz, s);
+    else if (s.type == SHAPE_TYPE_PLANE)    return sdPlane(p, s);
+    else if (s.type == SHAPE_TYPE_FRACTAL)  return DE(p);
+    return 0.0;
+}
+
+float map(in vec3 p) {
+    float sd = MAX_DISTANCE;
+    for (int i = 0; i < shapeCount; i++) {
+        sd = min(sd, sdShape(p, shapes[i]));
+    }
+    return sd;
+}
+float mapShape(in vec3 p, out int shapeID) {
+    float sd = MAX_DISTANCE;
+    float s;
+    for (int i = 0; i < shapeCount; i++) {
+        if ((s = sdShape(p, shapes[i])) < sd) {
+            sd = s;
+            shapeID = i;
+        }
+    }
+    return sd;
+}
+
+float intersect(in vec3 p, in vec3 dir, in float maxDepth, out vec4 sdpos) {
+    float sd;
+    for (float depth = EPSILON; depth < maxDepth; depth += sd) {
+        vec3 cp = p + depth * dir;
+        float sd = map(cp);
+        if (sd < MIN_HIT_DISTANCE) {
+            sdpos.xyz = cp;
+            sdpos.w = sd;
+            return depth;
+        }
+    }
+    return maxDepth;
+}
+float intersectShape(in vec3 p, in vec3 dir, in float maxDepth, out vec4 sdpos, out int shapeID) {
+    float sd;
+    for (float depth = EPSILON; depth < maxDepth; depth += sd) {
+        vec3 cp = p + depth * dir;
+        sd = mapShape(cp, shapeID);
+        if (sd < MIN_HIT_DISTANCE) {
+            sdpos.xyz = cp;
+            sdpos.w = sd;
+            return depth;
+        }
+    }
+    return maxDepth;
+}
+
+vec3 sceneNormal(in vec3 p, in float sd) {
+#if 1
+    const vec2 e = vec2(EPSILON, 0);
+    return normalize(vec3(
+        sd - map(vec3(p - e.xyy)),
+        sd - map(vec3(p - e.yxy)),
+        sd - map(vec3(p - e.yyx))
+    ));
+#else
+    vec3 n = vec3(0.0);
+    for(int i = 0; i < 4; i++) {
+        vec3 e = 0.5773 * (2.0 * vec3((((i + 3) >> 1) & 1),((i >> 1) & 1),(i & 1)) - 1.0);
+        n += e * map(p + 0.0005 * e).x;
+    }
+    return normalize(n);
+#endif
+}
+
+/* ------------- LIGHT --------------- */
+
+float hardShadow(in vec3 p, in vec3 ldir, in float mint, in float maxt) {
+    for (float t = mint; t < maxt;) {
+        float sd = map(p + ldir * t);
+        if (sd < MIN_HIT_DISTANCE) return 0.0f;
+        t += sd;
+    }
+    return 1.0;
+}
+float softShadow(in vec3 p, in vec3 ldir, in float mint, in float maxt, in float k) {
+    float res = 1.0f;
+    float ph = 1e20f;
+    for (float t = mint; t < maxt;) {
+        float sd = map(p + ldir * t);
+        if (sd < MIN_HIT_DISTANCE) return 0.0f;
+        float y = sd * sd / (2.0f * ph);
+        float d = sqrt(sd * sd - y * y);
+        res = min(res, k * d / max(0.0f, t - y));
+        ph = sd;
+        t += sd;
+    }
+    return res;
+}
+
+#define HASHSCALE1 0.1031
+float hash(float p) {
+    vec3 p3  = fract(vec3(p) * HASHSCALE1);
+    p3 += dot(p3, p3.yzx + 19.19);
+    return fract((p3.x + p3.y) * p3.z);
+}
+vec3 randomSphereDir(vec2 rnd) {
+    float s = rnd.x * PI * 2.0;
+    float t = rnd.y * 2.0 - 1.0;
+    return vec3(sin(s), cos(s), t) / sqrt(1.0 + t * t);
+}
+vec3 randomHemisphereDir(vec3 dir, float i) {
+    vec3 v = randomSphereDir(vec2(hash(i + 1), hash(i + 2)));
+    return v * sign(dot(v, dir));
+}
+float ambientOcclusion(in vec3 p, in vec3 n, in float maxDist, in float falloff) {
+    const int nbIte = 4;
+    const float nbIteInv = 1 / float(nbIte);
+    const float rad = 1 - 1 * nbIteInv; //Hemispherical factor (self occlusion correction)
+
+    float ao = 0.0;
+    for(int i = 0; i < nbIte; i++) {
+        float l = hash(float(i)) * maxDist;
+        vec3 rd = normalize(n + randomHemisphereDir(n, l) * rad) * l; // mix direction with the normal for self occlusion problems!
+        ao += (l - max(map(p + rd), 0)) / maxDist * falloff;
+    }
+    return clamp(1 - ao * nbIteInv, 0, 1);
+}
+
+vec3 shade(in vec3 p, in vec3 normal, in int materialID) {
+    const vec3 lightDir = normalize(vec3(-0.5, 1.0, 0.5));
+    float diffuseCoeff = max(dot(normal, lightDir), 0.0);
+    float ambientOcclusion = ambientOcclusion(p, normal, 1.0, 1.0);
+    float shadow = softShadow(p, lightDir, 0.01f, MAX_DISTANCE, 8);
+    //float shadow = hardShadow(p, lightDir, 0.01f, MAX_DISTANCE);
+
+    //float ambient = 0.5 + 0.5 * normal.y;
+
+    vec3 diffuse = diffuseCoeff * vec3(1.0, 0.9, 0.8) * materials[materialID].color * shadow;
+    vec3 ambient = materials[materialID].color * vec3(0.05, 0.1, 0.15) * ambientOcclusion;
+
+    return diffuse + ambient;
+}
+
+vec3 rshade(in vec3 p, in vec3 normal, in int materialID) {
+    const vec3 lightDir = normalize(vec3(-0.5, 1.0, 0.5));
+    float diffuseCoeff = max(dot(normal, lightDir), 0.0);
+    float ambientOcclusion = ambientOcclusion(p, normal, 0.5, 1.0);
+    float shadow = softShadow(p, lightDir, 0.01f, MAX_DISTANCE, 8);
+    //float shadow = hardShadow(p, lightDir, 0.01f, MAX_DISTANCE);
+
+    //float ambient = 0.5 + 0.5 * normal.y;
+
+    vec3 diffuse = diffuseCoeff * vec3(1.0, 0.9, 0.8) * materials[materialID].color * shadow;
+    vec3 ambient = materials[materialID].color * vec3(0.05, 0.1, 0.15) * ambientOcclusion;
+
+    return diffuse + ambient;
+}
+
+vec3 raymarch(in vec3 eye, in vec3 dir) {
+    //const vec3 backgroundColor = vec3(1., 163., 236.) / vec3(300.);
+    vec3 backgroundColor = vec3(0.05, 0.1, 0.15) * 5.;
+
+    // Debug projection
+    float sdc = map(eye);
+    vec3 cnormal = sceneNormal(eye, sdc);
+    vec3 target = eye + -cnormal * sdc;
+
+    vec4 sdpos;
+    int shapeID;
+    float depth = intersectShape(eye, dir, MAX_DISTANCE, sdpos, shapeID);
+    if (depth < MAX_DISTANCE) {
+        vec3 normal = sceneNormal(sdpos.xyz, sdpos.w);
+        int mID = shapes[shapeID].mID;
+        vec3 color = shade(sdpos.xyz, normal, mID) + (depth / (MAX_DISTANCE * 1.2)) * 1.2;
+
+        if (distance(target, sdpos.xyz) < 0.05) color = vec3(1, 0, 0);
+
+        if (materials[mID].reflect) {
+            vec3 rdir = reflect(dir, normal);
+            float rdepth = intersectShape(sdpos.xyz + normal * 0.01f, rdir, MAX_DISTANCE, sdpos, shapeID);
+            if (rdepth < MAX_DISTANCE) {
+                normal = sceneNormal(sdpos.xyz, sdpos.w);
+                vec3 rColor = rshade(sdpos.xyz, normal, shapes[shapeID].mID);
+                color = mix(color, rColor, 0.6);
+            } else {
+                color = mix(color, backgroundColor + abs(1.0 - rdir.y) * 0.4, 0.6);
+            }
+        }
+
+        return color;
+    }
+
+    return backgroundColor + abs(1.0 - dir.y) * 0.4;
+
+    /*float depth = 0.1;
+    int step = 0;
+    for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
+        vec3 currentPosition = eye + depth * dir;
+        int materialID;
+        float sd = mapWithMaterial(currentPosition, materialID);
+        if (sd < MIN_HIT_DISTANCE) { // Hit
+
+            vec3 normal = sceneNormal(currentPosition, sd);
+
+            vec3 color;
+            if (materials[materialID].reflect) {
+                //vec3 rdir = reflect(dir, normal);
+                //vec3 rcolor = reflection(currentPosition, rdir);
+                //color = raymarch(currentPosition, rdir);
+            } else {
+                color = shade(currentPosition, sd, materialID);
+            }
+
+            return color * max(0, 1.0 - (depth / MAX_DISTANCE));
+            //return vec3(float(step) / MAX_MARCHING_STEPS);
+        } else if (depth > MAX_DISTANCE) {
+            break;
+        }
+        depth += sd;
+        step += 1;
+    }
+
+    //return vec3(float(step) / MAX_MARCHING_STEPS);
+    return vec3(0);*/
+}
+
+void main() {
+    // Get the pixel position
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    // Get the image size
+    ivec2 size = imageSize(image);
+
+    // Ignore pixels outside image
+    if (any(greaterThanEqual(pos, size)))
+        return;
+
+    // Raymarch
+    vec3 color = vec3(0);
+    vec2 p;
+    vec3 dir;
+
+    // Get normalized pixel position
+    p = (vec2(pos) + vec2(0.5)) / vec2(size);
+    // Get direction vector
+    dir = mix(mix(ray00, ray01, p.y), mix(ray10, ray11, p.y), p.x);
+    // Get color
+    color += raymarch(eye, normalize(dir));
+
+    /*// Get normalized pixel position
+    p = (vec2(pos) + vec2(0.7)) / vec2(size);
+    // Get direction vector
+    dir = mix(mix(ray00, ray01, p.y), mix(ray10, ray11, p.y), p.x);
+    // Get color
+    color += raymarch(eye, normalize(dir));*/
+
+    //color /= 2;
+
+    // Save color
+    imageStore(image, pos, vec4(color, 1));
+}
