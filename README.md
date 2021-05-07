@@ -5,7 +5,7 @@
 This project is an Open Source, multi-platform 3D rendering engine based on ray marching technique. This engine aims
 to provide a simple rendering using Java.
 
-![alt text](img/wip.png | width=100)
+# :construction_worker: WIP Project :construction_worker:
 
 ## Images 
 
