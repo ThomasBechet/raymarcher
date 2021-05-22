@@ -18,7 +18,7 @@ void main() {
 	// Primary ray
 	HitInfo hit;
 	hit = intersectScene(eye, dir, MAX_DISTANCE);
-	if (hit.intersect) {		
+	if (hit.intersect) {
 		// Write images
 		positionDepthTex  = vec4(hit.position, hit.depth);
 		normalMaterialTex = vec4(hit.normal, hit.materialID); 

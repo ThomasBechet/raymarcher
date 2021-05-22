@@ -18,11 +18,12 @@ dependencies {
 
     compile group: 'org.joml', name: 'joml', version:"${jomlVersion}"
     compile group: 'org.lwjgl', name: 'lwjgl', version:"${lwjglVersion}"
-    compile group: 'org.lwjgl', name: 'lwjgl', version:"${lwjglVersion}", classifier:'natives-windows'
+    compile group: 'org.lwjgl', name: 'lwjgl', version:"${lwjglVersion}", classifier: 'natives-windows'
     compile group: 'org.lwjgl', name: 'lwjgl-opengl', version:"${lwjglVersion}"
-    compile group: 'org.lwjgl', name: 'lwjgl-opengl', version:"${lwjglVersion}", classifier:'natives-windows'
+    compile group: 'org.lwjgl', name: 'lwjgl-opengl', version:"${lwjglVersion}", classifier: 'natives-windows'
+    compile group: 'org.lwjgl', name: 'lwjgl-vulkan', version:"${lwjglVersion}"
     compile group: 'org.lwjgl', name: 'lwjgl-glfw', version:"${lwjglVersion}"
-    compile group: 'org.lwjgl', name: 'lwjgl-glfw', version:"${lwjglVersion}", classifier:'natives-windows'
+    compile group: 'org.lwjgl', name: 'lwjgl-glfw', version:"${lwjglVersion}", classifier: 'natives-windows'
 }
 
 test {
