@@ -1,7 +1,8 @@
+import input.Input;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 import renderer.RenderCamera;
-import renderer.RenderContext;
+import renderer.Renderer;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -14,15 +15,22 @@ public class Camera {
 
     private Vector3f velocity;
     private Transform transform;
+    private Vector3f direction;
+    private final Vector3f upVector;
+    private final Vector3f leftVector;
 
     private Input input;
     private RenderCamera camera;
 
-    public Camera(Input input, RenderContext context) {
+    public Camera(Input input, Renderer renderer) {
         this.input = input;
+        this.camera = renderer.getActiveCamera();
+
         this.transform = new Transform();
         this.transform.setTranslation(new Vector3f(0, 0, 5));
-        this.camera = context.getActiveCamera();
+        this.direction = new Vector3f();
+        this.upVector = new Vector3f(0, 1, 0);
+        this.leftVector = new Vector3f(-1, 0, 0);
     }
 
     public void update(float delta) {
@@ -36,7 +44,7 @@ public class Camera {
         int downState = this.input.getKeyboardState(GLFW_KEY_Z);
 
         // Translation
-        Vector3f direction = new Vector3f(0, 0, 0);
+        this.direction.set(0, 0, 0);
         if (forwardState == GLFW_PRESS) direction.add(this.transform.getForwardVector());
         if (backwardState == GLFW_PRESS) direction.add(this.transform.getBackwardVector());
         if (leftState == GLFW_PRESS) direction.add(this.transform.getLeftVector());
@@ -52,8 +60,8 @@ public class Camera {
         this.yaw += motion.x * this.sensibility;
         this.pitch += motion.y * this.sensibility;
         this.pitch = Math.max(-90.0f, Math.min(this.pitch, 90.0f));
-        this.transform.setRotation((float)(-Math.toRadians(this.yaw)), new Vector3f(0, 1, 0));
-        this.transform.rotate((float)Math.toRadians(this.pitch), new Vector3f(-1, 0, 0));
+        this.transform.setRotation((float)(-Math.toRadians(this.yaw)), this.upVector);
+        this.transform.rotate((float)Math.toRadians(this.pitch), this.leftVector);
 
         // Update camera
         Vector3f eye = this.transform.getTranslation();

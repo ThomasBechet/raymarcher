@@ -1,9 +1,9 @@
 package shape;
 
 import org.joml.Vector3f;
-import renderer.RenderContext;
-import renderer.RenderShapeParameters;
-import renderer.RenderShapeType;
+import rendererOld.RenderContext;
+import rendererOld.RenderShapeParameters;
+import rendererOld.RenderShapeType;
 
 public class MengerSpongeShape extends Shape {
 

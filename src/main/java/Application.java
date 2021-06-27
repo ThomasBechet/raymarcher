@@ -1,11 +1,12 @@
+import input.GLFWInput;
 import org.joml.Vector3f;
 import org.lwjgl.glfw.*;
 import org.lwjgl.system.*;
 
 import java.nio.*;
 
-import renderer.RenderContext;
-import renderer.RenderMaterial;
+import rendererOld.RenderContext;
+import rendererOld.RenderMaterial;
 import shape.*;
 
 import static org.lwjgl.glfw.Callbacks.*;
@@ -18,7 +19,7 @@ public class Application {
 
     private long window;
     private RenderContext renderContext;
-    private Input input;
+    private GLFWInput input;
     private Camera camera;
 
     private Shape shapeRef;
@@ -83,15 +84,15 @@ public class Application {
         glfwShowWindow(this.window);
         glfwSetInputMode(this.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-        this.input = new Input(this.window);
-        this.renderContext = new RenderContext(1600, 900);
+//        this.input = new GLFWInput(this.window);
+//        this.renderContext = new RenderContext(1600, 900);
 
         glfwSetWindowSizeCallback(this.window, (window, width, height) -> {
             this.renderContext.updateResolution(width, height);
         });
 
         // Initialize camera
-        this.camera = new Camera(this.input, this.renderContext);
+//        this.camera = new Camera(this.input, this.renderContext);
 
         // Initialize scene
         RenderMaterial material0 = this.renderContext.createMaterial();

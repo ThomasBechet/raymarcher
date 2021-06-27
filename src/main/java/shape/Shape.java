@@ -1,9 +1,9 @@
 package shape;
 
-import renderer.RenderContext;
-import renderer.RenderMaterial;
-import renderer.RenderShape;
-import renderer.RenderShapeType;
+import rendererOld.RenderContext;
+import rendererOld.RenderMaterial;
+import rendererOld.RenderShape;
+import rendererOld.RenderShapeType;
 
 public abstract class Shape {
 

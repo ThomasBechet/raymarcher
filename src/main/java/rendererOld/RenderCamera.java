@@ -1,4 +1,4 @@
-package renderer;
+package rendererOld;
 
 public interface RenderCamera {
     void setEye(float x, float y, float z);

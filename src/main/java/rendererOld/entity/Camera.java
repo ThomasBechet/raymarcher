@@ -1,11 +1,15 @@
-package renderer.entity;
+package rendererOld.entity;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import renderer.RenderCamera;
+import org.lwjgl.system.MemoryStack;
+import rendererOld.RenderCamera;
+
+import java.nio.FloatBuffer;
+
+import static org.lwjgl.opengl.GL45.*;
 
 public class Camera implements RenderCamera {
-
     private float fov;
     private float ratio;
 
@@ -42,17 +46,14 @@ public class Camera implements RenderCamera {
     public void setEye(float x, float y, float z) {
         this.eye.set(x, y, z);
     }
-
     @Override
     public void setCenter(float x, float y, float z) {
         this.center.set(x, y, z);
     }
-
     @Override
     public void setUp(float x, float y, float z) {
         this.up.set(x, y, z);
     }
-
     @Override
     public void setRatio(float ration) {
         this.ratio = ration;
@@ -77,5 +78,23 @@ public class Camera implements RenderCamera {
         this.oldCenter.set(this.center);
         this.oldUp.set(this.up);
         this.oldCamMatrix.set(this.camMatrix);
+    }
+
+    public void pushGBufferPassUniforms() {
+        // Upload data
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            FloatBuffer fb = stack.mallocFloat(16);
+            this.camMatrix.get(fb);
+            glUniformMatrix4fv(0, false, fb);
+        }
+        glUniform3f(1, this.eye.x, this.eye.y, this.eye.z);
+    }
+
+    public void pushIndirectLightPassUniforms() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            FloatBuffer fb = stack.mallocFloat(16);
+            this.camMatrix.get(fb);
+            glUniformMatrix4fv(5, false, fb);
+        }
     }
 }

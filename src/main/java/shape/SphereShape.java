@@ -1,9 +1,9 @@
 package shape;
 
 import org.joml.Vector3f;
-import renderer.RenderContext;
-import renderer.RenderShapeType;
-import renderer.RenderShapeParameters;
+import rendererOld.RenderContext;
+import rendererOld.RenderShapeType;
+import rendererOld.RenderShapeParameters;
 
 public class SphereShape extends Shape {
 

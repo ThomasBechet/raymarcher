@@ -13,7 +13,7 @@ in vec2 uv;
 
 vec3 FxaaPixelShader(
     vec4 posPos, // Output of FxaaVertexShader interpolated across screen.
-    sampler2D tex, // Input texture.
+    sampler2D tex, // input.Input texture.
     vec2 rcpFrame // Constant {1.0/frameWidth, 1.0/frameHeight}.
 )
 {

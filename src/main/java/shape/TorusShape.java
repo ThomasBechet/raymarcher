@@ -1,10 +1,10 @@
 package shape;
 
-import renderer.RenderContext;
-import renderer.RenderShapeType;
+import rendererOld.RenderContext;
+import rendererOld.RenderShapeType;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
-import renderer.RenderShapeParameters;
+import rendererOld.RenderShapeParameters;
 
 public class TorusShape extends Shape {
 

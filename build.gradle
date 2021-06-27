@@ -3,7 +3,7 @@ plugins {
 }
 
 group 'org.raymarcher'
-version '1.0-SNAPSHOT'
+version '1.0'
 
 repositories {
     mavenCentral()
@@ -22,8 +22,12 @@ dependencies {
     compile group: 'org.lwjgl', name: 'lwjgl-opengl', version:"${lwjglVersion}"
     compile group: 'org.lwjgl', name: 'lwjgl-opengl', version:"${lwjglVersion}", classifier: 'natives-windows'
     compile group: 'org.lwjgl', name: 'lwjgl-vulkan', version:"${lwjglVersion}"
+    compile group: 'org.lwjgl', name: 'lwjgl-vma', version:"${lwjglVersion}"
+    compile group: 'org.lwjgl', name: 'lwjgl-vma', version:"${lwjglVersion}", classifier: 'natives-windows'
     compile group: 'org.lwjgl', name: 'lwjgl-glfw', version:"${lwjglVersion}"
     compile group: 'org.lwjgl', name: 'lwjgl-glfw', version:"${lwjglVersion}", classifier: 'natives-windows'
+    compile group: 'org.lwjgl', name: 'lwjgl-shaderc', version:"${lwjglVersion}"
+    compile group: 'org.lwjgl', name: 'lwjgl-shaderc', version:"${lwjglVersion}", classifier: 'natives-windows'
 }
 
 test {
@@ -35,5 +39,15 @@ sourceSets {
         resources {
             srcDirs "src/main/resources"
         }
+    }
+}
+
+jar {
+    manifest {
+        attributes "Main-Class": "ApplicationVulkan"
+    }
+
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
     }
 }

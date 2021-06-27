@@ -18,6 +18,7 @@ to provide a simple rendering using Java.
 ## TODO :
 
 - [ ] Use the shapeID to determine the normal
+- [ ] Use screen space derivatives to compute normals (use camera space for better precision)
 - [ ] Fish-eye effect (barrel distortion)
 - [ ] Global illumination
 - [ ] Acceleration structure
