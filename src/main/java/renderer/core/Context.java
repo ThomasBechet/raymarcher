@@ -1,4 +1,4 @@
-package renderer.engine;
+package renderer.core;
 
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -25,6 +25,7 @@ public class Context {
     private VkInstance instance;
     private long debugReportCallback;
     private VkPhysicalDevice physicalDevice;
+    private VkPhysicalDeviceProperties physicalDeviceProperties;
     private long surface;
     private int graphicsQueueFamilyIndex;
     private int presentQueueFamilyIndex;
@@ -243,6 +244,8 @@ public class Context {
                 if (this.physicalDevice == null) {
                     throw new IllegalStateException("Failed to find suitable physical device.");
                 }
+
+                vkGetPhysicalDeviceProperties(this.physicalDevice, this.physicalDeviceProperties);
             } else {
                 throw new IllegalStateException("No physical device accessible.");
             }
@@ -342,6 +345,7 @@ public class Context {
 
     public Context(Window window) {
         this.window = window;
+        this.physicalDeviceProperties = VkPhysicalDeviceProperties.malloc();
 
         createInstance();
         this.surface = this.window.createWindowSurfaceWSI(this.instance);
@@ -359,6 +363,7 @@ public class Context {
         }
         vkDestroySurfaceKHR(this.instance, this.surface, null);
         vkDestroyInstance(this.instance, null);
+        this.physicalDeviceProperties.free();
     }
 
     public VkInstance getInstance() {
@@ -369,6 +374,9 @@ public class Context {
     }
     public VkPhysicalDevice getPhysicalDevice() {
         return this.physicalDevice;
+    }
+    public VkPhysicalDeviceProperties getPhysicalDeviceProperties() {
+        return this.physicalDeviceProperties;
     }
     public VkDevice getDevice() {
         return this.device;

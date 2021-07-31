@@ -27,10 +27,6 @@ public class ApplicationVulkan {
         renderer.cleanup();
         input.cleanup();
         window.cleanup();
-
-//        long buffer = memory.createBuffer(1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU);
-//        PointerBuffer data = memPointerBuffer(memory.mapBuffer(buffer), 1024);
-//        memory.unmapBuffer(buffer);
     }
 
     public static void main(String[] args) {

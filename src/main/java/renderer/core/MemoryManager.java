@@ -1,4 +1,4 @@
-package renderer.engine;
+package renderer.core;
 
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;

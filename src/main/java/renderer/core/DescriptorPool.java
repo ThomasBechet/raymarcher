@@ -1,9 +1,9 @@
-package renderer.memory;
+package renderer.core;
 
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolSize;
-import renderer.engine.Context;
+import renderer.core.Context;
 
 import java.nio.LongBuffer;
 
@@ -15,18 +15,18 @@ public class DescriptorPool {
 
     private long descriptorPool;
 
-    public DescriptorPool(Context context, int frameResourceCount) {
+    public DescriptorPool(Context context, int maxInFlightFrameCount) {
         this.ctx = context;
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.callocStack(1, stack)
                     .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-                    .descriptorCount(frameResourceCount * 1);
+                    .descriptorCount(maxInFlightFrameCount * 1);
 
             VkDescriptorPoolCreateInfo info = VkDescriptorPoolCreateInfo.callocStack(stack)
                     .sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
                     .pPoolSizes(poolSizes)
-                    .maxSets(frameResourceCount);
+                    .maxSets(maxInFlightFrameCount);
 
             LongBuffer lp = stack.mallocLong(1);
             int err = vkCreateDescriptorPool(this.ctx.getDevice(), info, null, lp);

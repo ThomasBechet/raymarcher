@@ -3,6 +3,7 @@ package renderer.entity;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import renderer.RenderCamera;
+import renderer.buffer.HighFrequencyUniformBuffer;
 
 public class Camera implements RenderCamera {
 
@@ -22,7 +23,7 @@ public class Camera implements RenderCamera {
     private Matrix4f oldCamMatrix;
 
     public Camera() {
-        this.fov = 60.0f;
+        this.fov = 90.0f;
         this.ratio = 1.0f;
 
         this.viewMatrix = new Matrix4f();
@@ -77,5 +78,10 @@ public class Camera implements RenderCamera {
         this.oldCenter.set(this.center);
         this.oldUp.set(this.up);
         this.oldCamMatrix.set(this.camMatrix);
+    }
+
+    public void writeUniformBuffer(int index, HighFrequencyUniformBuffer buffer) {
+        buffer.writeVPMatrix(index, this.camMatrix);
+        buffer.writeEye(index, this.eye);
     }
 }

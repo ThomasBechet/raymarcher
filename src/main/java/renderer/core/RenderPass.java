@@ -1,4 +1,4 @@
-package renderer.engine;
+package renderer.core;
 
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkAttachmentDescription;

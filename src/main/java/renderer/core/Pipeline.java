@@ -1,4 +1,4 @@
-package renderer.engine;
+package renderer.core;
 
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
@@ -15,21 +15,45 @@ public abstract class Pipeline {
     private long pipelineLayout;
     private long pipeline;
 
+    private VkViewport.Buffer viewports;
+    private VkRect2D.Buffer scissors;
+
     public Pipeline(Context context, RenderPass renderPass) {
         this.ctx = context;
         this.renderPass = renderPass;
+
         this.pipelineLayout = VK_NULL_HANDLE;
         this.pipeline = VK_NULL_HANDLE;
+
+        this.viewports = VkViewport.calloc(1);
+        this.scissors = VkRect2D.calloc(1);
     }
 
     public void cleanup() {
+        this.viewports.free();
+        this.scissors.free();
+
         vkDestroyPipeline(this.ctx.getDevice(), this.pipeline, null);
         vkDestroyPipelineLayout(this.ctx.getDevice(), this.pipelineLayout, null);
+
         this.pipeline = VK_NULL_HANDLE;
         this.pipelineLayout = VK_NULL_HANDLE;
     }
 
-    protected void createPipelineLayout(LongBuffer descriptorSetLayouts) {
+    protected void setViewport(int x, int y, int width, int height) {
+        this.viewports.x(x).y(y).width(width).height(height);
+    }
+
+    protected void setScissor(int x, int y, int width, int height) {
+        this.scissors.offset().set(x, y);
+        this.scissors.extent().set(width, height);
+    }
+
+    protected void buildPipelineLayout(LongBuffer descriptorSetLayouts) {
+        if (this.pipelineLayout != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(this.ctx.getDevice(), this.pipelineLayout, null);
+        }
+
         try (MemoryStack stack = MemoryStack.stackPush()) {
             // Create pipeline layout
             VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkPipelineLayoutCreateInfo.callocStack(stack)
@@ -46,13 +70,13 @@ public abstract class Pipeline {
         }
     }
 
-    protected void createPipeline(
-        VkPipelineShaderStageCreateInfo.Buffer shaderStageInfo,
-        VkViewport.Buffer viewports,
-        VkRect2D.Buffer scissors
-    ) {
+    protected void buildPipeline(VkPipelineShaderStageCreateInfo.Buffer shaderStageInfo) {
         if (this.pipelineLayout == VK_NULL_HANDLE) {
             throw new IllegalStateException("Failed to create pipeline: pipeline layout was not created.");
+        }
+
+        if (this.pipeline != VK_NULL_HANDLE) {
+            vkDestroyPipeline(this.ctx.getDevice(), this.pipeline, null);
         }
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -71,8 +95,8 @@ public abstract class Pipeline {
             // Create viewport state
             VkPipelineViewportStateCreateInfo viewportState = VkPipelineViewportStateCreateInfo.callocStack(stack)
                     .sType(VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO)
-                    .pViewports(viewports)
-                    .pScissors(scissors);
+                    .pViewports(this.viewports)
+                    .pScissors(this.scissors);
 
             // Create rasterization state
             VkPipelineRasterizationStateCreateInfo rasterizationState = VkPipelineRasterizationStateCreateInfo.callocStack(stack)
@@ -103,8 +127,8 @@ public abstract class Pipeline {
             VkPipelineDynamicStateCreateInfo dynamicState = VkPipelineDynamicStateCreateInfo.callocStack(stack)
                     .sType(VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
             int dynamicFlags = 0x0;
-            if (viewports == null) dynamicFlags |= VK_DYNAMIC_STATE_VIEWPORT;
-            if (scissors == null) dynamicFlags |= VK_DYNAMIC_STATE_SCISSOR;
+            if (this.viewports == null) dynamicFlags |= VK_DYNAMIC_STATE_VIEWPORT;
+            if (this.scissors == null) dynamicFlags |= VK_DYNAMIC_STATE_SCISSOR;
             dynamicState.flags(dynamicFlags);
 
             // Create pipeline
